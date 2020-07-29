@@ -1,10 +1,15 @@
 
-  a:hover, button:hover, {
+  button:hover {
   background-color: Aqua;
   font-size: 20px;
   font-weight: bold;
 }
 
+  .update:hover {
+    font-weight: bold;
+    background-color: Aqua;
+    font-size: 20px;
+  }
   .logo {
     width: 200px;
     background-color: Aqua;
@@ -56,6 +61,6 @@
         border-width: medium;
       }
 
-       a {
+      a {
         font-size: 19px;
       }
