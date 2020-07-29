@@ -1,7 +1,7 @@
 
-  a:hover, button:hover {
+  a:hover, button:hover, {
   background-color: Aqua;
-  font-size: 17px;
+  font-size: 20px;
   font-weight: bold;
 }
 
@@ -26,7 +26,7 @@
       }
 
       b {
-        font-size: 17.5px;
+        font-size: 17px;
       }
 
       li {
@@ -46,7 +46,7 @@
 
 
       h4 {
-        font-size: 18.5px;
+        font-size: 18px;
       }
 
       .header-button {
@@ -54,4 +54,8 @@
         font-size: 17px;
         border-size: 10px;
         border-width: medium;
+      }
+
+       a {
+        font-size: 19px;
       }
