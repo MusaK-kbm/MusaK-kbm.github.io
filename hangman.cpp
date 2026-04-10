@@ -1,155 +1,229 @@
-
 #include <SFML/Graphics.hpp>
 #include <SFML/Window.hpp>
+#include <SFML/System.hpp>
+#include <iostream>
 #include <vector>
 #include <string>
-#include <random>
+#include <cstdlib>
 #include <ctime>
-#include <iostream>
+#include <fstream>
+#include <cctype>
 
-// Hangman variables
-const int MAX_TRIES = 5;
-std::string getRandomWord();
-int letterFill(char guess, std::string& maskedWord, const std::string& secretWord);
+using namespace std;
 
-int main() {
-    // Initialize SFML window
-    sf::RenderWindow window(sf::VideoMode(600, 400), "Hangman Game");
+class HangmanGame {
+private:
+    string currentWord; // word to guess
+    string guessedWord; // current state of guessed word
+    vector<char> wrongGuesses; // list of the wrong guesses
+    int maxAttempts; // maximum number of incorrect guesses that are allowed
 
-    // Choose a word
-    std::string secretWord = getRandomWord();
-    std::string maskedWord(secretWord.size(), '*');
-    int wrongGuesses = 0;
-
-    // Set up font
-    sf::Font font;
-    if (!font.loadFromFile("arial.ttf")) {
-        std::cerr << "Font loading failed\n";
-        return 1;
+public:
+    HangmanGame(const string& word, int attempts)
+        : currentWord(word), maxAttempts(attempts) {
+        guessedWord = string(currentWord.length(), '_'); // guessed words are filled with underscores
+        for (size_t i = 0; i < currentWord.length(); ++i) {
+            if (currentWord[i] == ' ') {
+                guessedWord[i] = ' ';
+            }
+        }
     }
 
-    // Text elements
-    sf::Text displayWord(maskedWord, font, 30);
-    displayWord.setPosition(50, 50);
-    sf::Text message("Guess a letter:", font, 20);
-    message.setPosition(50, 150);
-    sf::Text triesLeft("Tries left: " + std::to_string(MAX_TRIES - wrongGuesses), font, 20);
-    triesLeft.setPosition(50, 200);
+    bool guess(char letter) {
+        bool found = false;
+        letter = tolower(letter);
+        for (size_t i = 0; i < currentWord.length(); ++i) {
+            if (tolower(currentWord[i]) == letter) {
+                guessedWord[i] = currentWord[i];
+                found = true;
+            }
+        }
+        if (!found && find(wrongGuesses.begin(), wrongGuesses.end(), letter) == wrongGuesses.end()) {
+            wrongGuesses.push_back(letter);
+        }
+        return found;
+    }
 
-    // Main game loop
+    bool isWon() const {
+        return guessedWord == currentWord;
+    }
+
+    bool isLost() const {
+        return wrongGuesses.size() >= maxAttempts;
+    }
+
+    string getGuessedWord() const {
+        return guessedWord;
+    }
+
+    string getWrongGuesses() const {
+        return string(wrongGuesses.begin(), wrongGuesses.end());
+    }
+
+    string getCurrentWord() const {
+        return currentWord;
+    }
+
+    int getMaxAttempts() const {
+        return maxAttempts;
+    }
+};
+
+// function to extract a random word from the countries.txt file
+string getRandomWord(const string& filename) {
+    ifstream file(filename);
+    if (!file.is_open()) {
+        cerr << "Could not open the file: " << filename << endl;
+        exit(1);
+    }
+
+    vector<string> words;
+    string word;
+    while (getline(file, word)) {
+        if (!word.empty()) {
+            words.push_back(word);
+        }
+    }
+    file.close();
+
+    if (words.empty()) {
+        cerr << "No words found in the file!" << endl;
+        exit(1);
+    }
+
+    srand(static_cast<unsigned int>(time(nullptr)));
+    return words[rand() % words.size()];
+}
+
+// fucntion for rendering the visual aspect of the game
+void drawGame(sf::RenderWindow& window, HangmanGame& game, sf::Font& font, sf::CircleShape& head, sf::RectangleShape& body, sf::RectangleShape& leftArm, sf::RectangleShape& rightArm, sf::RectangleShape& leftLeg, sf::RectangleShape& rightLeg) {
+    window.clear(sf::Color::White);
+
+    sf::Vector2u windowSize = window.getSize();
+    float centerX = windowSize.x / 2.0f;
+
+    // display the guessed word
+    sf::Text guessedWordText(game.getGuessedWord(), font, 30);
+    guessedWordText.setFillColor(sf::Color::Black);
+    guessedWordText.setPosition(centerX - guessedWordText.getLocalBounds().width / 2, 50);
+    window.draw(guessedWordText);
+
+    // display the incorrectly guessed alphabets
+    sf::Text wrongGuessesText("Wrong guesses: " + game.getWrongGuesses(), font, 20);
+    wrongGuessesText.setFillColor(sf::Color::Red);
+    wrongGuessesText.setPosition(50, 120);
+    window.draw(wrongGuessesText);
+
+    // display the remaining attempts left  
+    int attemptsLeft = game.getMaxAttempts() - game.getWrongGuesses().size();
+    sf::Text attemptsText("Attempts left: " + to_string(attemptsLeft), font, 20);
+    attemptsText.setFillColor(sf::Color::Black);
+    attemptsText.setPosition(50, 180);
+    window.draw(attemptsText);
+
+
+    float hangmanBaseX = centerX - 50;
+    float hangmanBaseY = 250;
+
+    if (game.getWrongGuesses().size() >= 1) {
+        head.setPosition(hangmanBaseX, hangmanBaseY - 50);
+        window.draw(head);
+    }
+    if (game.getWrongGuesses().size() >= 2) {
+        body.setPosition(hangmanBaseX + 10, hangmanBaseY - 20);
+        window.draw(body);
+    }
+    if (game.getWrongGuesses().size() >= 3) {
+        leftArm.setPosition(hangmanBaseX - 15, hangmanBaseY - 20);
+        leftArm.setRotation(45);
+        window.draw(leftArm);
+    }
+    if (game.getWrongGuesses().size() >= 4) {
+        rightArm.setPosition(hangmanBaseX + 30, hangmanBaseY - 20);
+        rightArm.setRotation(-45);
+        window.draw(rightArm);
+    }
+    if (game.getWrongGuesses().size() >= 5) {
+        leftLeg.setPosition(hangmanBaseX + 5, hangmanBaseY + 30);
+        leftLeg.setRotation(45);
+        window.draw(leftLeg);
+    }
+    if (game.getWrongGuesses().size() >= 6) {
+        rightLeg.setPosition(hangmanBaseX + 15, hangmanBaseY + 30);
+        rightLeg.setRotation(-45);
+        window.draw(rightLeg);
+    }
+
+    window.display();
+}
+
+int main() {
+    sf::RenderWindow window(sf::VideoMode(800, 600), "Hangman Game");
+    sf::Font font;
+    if (!font.loadFromFile("arial.ttf")) {
+        cerr << "Could not load font!" << endl;
+        return -1;
+    }
+
+    // intialization of shapes for the hangman figure
+    sf::CircleShape head(15);
+    head.setFillColor(sf::Color::Black);
+    head.setOrigin(15, 15);
+
+    sf::RectangleShape body(sf::Vector2f(5, 50));
+    body.setFillColor(sf::Color::Black);
+    body.setOrigin(2.5, 0);
+
+    sf::RectangleShape leftArm(sf::Vector2f(5, 30));
+    leftArm.setFillColor(sf::Color::Black);
+    leftArm.setOrigin(2.5, 0);
+
+    sf::RectangleShape rightArm(sf::Vector2f(5, 30));
+    rightArm.setFillColor(sf::Color::Black);
+    rightArm.setOrigin(2.5, 0);
+
+    sf::RectangleShape leftLeg(sf::Vector2f(5, 30));
+    leftLeg.setFillColor(sf::Color::Black);
+    leftLeg.setOrigin(2.5, 0);
+
+    sf::RectangleShape rightLeg(sf::Vector2f(5, 30));
+    rightLeg.setFillColor(sf::Color::Black);
+    rightLeg.setOrigin(2.5, 0);
+
+    // random word extracted from countries.txt file for the game
+    string filename = "countries.txt";
+    string randomWord = getRandomWord(filename);
+    HangmanGame game(randomWord, 6);
+
     while (window.isOpen()) {
         sf::Event event;
         while (window.pollEvent(event)) {
             if (event.type == sf::Event::Closed) {
                 window.close();
-            } else if (event.type == sf::Event::TextEntered) {
-                if (isalpha(event.text.unicode)) {
-                    char guess = tolower(static_cast<char>(event.text.unicode));
-                    
-                    // Process the guess
-                    if (letterFill(guess, maskedWord, secretWord) == 0) {
-                        wrongGuesses++;
-                        message.setString("Incorrect guess!");
-                    } else {
-                        message.setString("Correct guess!");
-                    }
-
-                    // Update display
-                    displayWord.setString(maskedWord);
-                    triesLeft.setString("Tries left: " + std::to_string(MAX_TRIES - wrongGuesses));
-
-                    // Check for win or lose
-                    if (maskedWord == secretWord) {
-                        message.setString("You won! The word was: " + secretWord);
-                        window.clear();
-                        window.draw(displayWord);
-                        window.draw(message);
-                        window.draw(triesLeft);
-                        window.display();
-                        sf::sleep(sf::seconds(3)); // Pause to show win message
-                        window.close();
-                    } else if (wrongGuesses >= MAX_TRIES) {
-                        message.setString("Game over! The word was: " + secretWord);
-                        window.clear();
-                        window.draw(displayWord);
-                        window.draw(message);
-                        window.draw(triesLeft);
-                        window.display();
-                        sf::sleep(sf::seconds(3)); // Pause to show lose message
-                        window.close();
-                    }
+            }
+            if (event.type == sf::Event::TextEntered) {
+                if (event.text.unicode < 128 && isalpha(event.text.unicode)) {
+                    char letter = static_cast<char>(event.text.unicode);
+                    game.guess(tolower(letter));
                 }
             }
         }
 
-        // Draw everything
-        window.clear();
-        window.draw(displayWord);
-        window.draw(message);
-        window.draw(triesLeft);
-        window.display();
+        drawGame(window, game, font, head, body, leftArm, rightArm, leftLeg, rightLeg);
+
+        // end the game when it has been either won or lost
+        if (game.isWon() || game.isLost()) {
+            window.clear(sf::Color::White);
+            string resultMessage = game.isWon() ? "You Won!" : "You Lost! The word was: " + game.getCurrentWord();
+            sf::Text resultText(resultMessage, font, 30);
+            resultText.setFillColor(sf::Color::Black);
+            resultText.setPosition(window.getSize().x / 2.0f - resultText.getLocalBounds().width / 2, window.getSize().y / 2.0f - 50);
+            window.draw(resultText);
+            window.display();
+            sf::sleep(sf::seconds(3));
+            window.close();
+        }
     }
 
     return 0;
-}
-
-std::string getRandomWord() {
-    std::vector<std::string> words = {
-        "Afghanistan", "Albania", "Algeria", "America", "Andorra",
-        "Angola", "Antigua", "Argentina", "Armenia", "Australia",
-        "Austria", "Azerbaijan", "Bahamas", "Bahrain", "Bangladesh",
-        "Barbados", "Belarus", "Belgium", "Belize", "Benin",
-        "Bhutan", "Bissau", "Bolivia", "Bosnia", "Botswana",
-        "Brazil", "British", "Brunei", "Bulgaria", "Burkina",
-        "Burma", "Burundi", "Cambodia", "Cameroon", "Canada",
-        "Cape Verde", "Central African Republic", "Chad", "Chile", "China",
-        "Colombia", "Comoros", "Congo", "Costa Rica", "Croatia",
-        "Cuba", "Cyprus", "Czech", "Denmark", "Djibouti",
-        "Dominica", "East Timor", "Ecuador", "Egypt", "El Salvador",
-        "Emirates", "England", "Eritrea", "Estonia", "Ethiopia",
-        "Fiji", "Finland", "France", "Gabon", "Gambia",
-        "Georgia", "Germany", "Ghana", "Great Britain", "Greece",
-        "Grenada", "Grenadines", "Guatemala", "Guinea", "Guyana",
-        "Haiti", "Herzegovina", "Honduras", "Hungary", "Iceland",
-        "India", "Indonesia", "Iran", "Iraq", "Ireland",
-        "Israel", "Italy", "Ivory Coast", "Jamaica", "Japan",
-        "Jordan", "Kazakhstan", "Kenya", "Kiribati", "Korea",
-        "Kosovo", "Kuwait", "Kyrgyzstan", "Laos", "Latvia",
-        "Lebanon", "Lesotho", "Liberia", "Libya", "Liechtenstein",
-        "Lithuania", "Luxembourg", "Macedonia", "Madagascar", "Malawi",
-        "Malaysia", "Maldives", "Mali", "Malta", "Marshall",
-        "Mauritania", "Mauritius", "Mexico", "Micronesia", "Moldova",
-        "Monaco", "Mongolia", "Montenegro", "Morocco", "Mozambique",
-        "Myanmar", "Namibia", "Nauru", "Nepal", "Netherlands",
-        "New Zealand", "Nicaragua", "Niger", "Nigeria", "Norway",
-        "Oman", "Pakistan", "Palau", "Panama", "Papua",
-        "Paraguay", "Peru", "Philippines", "Poland", "Portugal",
-        "Qatar", "Romania", "Russia", "Rwanda", "Samoa",
-        "San Marino", "Sao Tome", "Saudi Arabia", "Scotland", "Senegal",
-        "Serbia", "Seychelles", "Sierra Leone", "Singapore", "Slovakia",
-        "Slovenia", "Solomon", "Somalia", "South Africa", "South Sudan",
-        "Spain", "Sri Lanka", "St. Kitts", "St. Lucia", "Sudan",
-        "Suriname", "Swaziland", "Sweden", "Switzerland", "Syria",
-        "Taiwan", "Tajikistan", "Tanzania", "Thailand", "Tobago",
-        "Togo", "Tonga", "Trinidad", "Tunisia", "Turkey",
-        "Turkmenistan", "Tuvalu", "Uganda", "Ukraine", "United Kingdom",
-        "United States", "Uruguay", "USA", "Uzbekistan", "Vanuatu",
-        "Vatican", "Venezuela", "Vietnam", "Wales", "Yemen",
-        "Zambia", "Zimbabwe"
-    };
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_int_distribution<> dist(0, words.size() - 1);
-    return words[dist(gen)];
-}
-
-int letterFill(char guess, std::string& maskedWord, const std::string& secretWord) {
-    int matches = 0;
-    for (size_t i = 0; i < secretWord.size(); i++) {
-        if (tolower(secretWord[i]) == guess && maskedWord[i] == '*') {
-            maskedWord[i] = secretWord[i];
-            matches++;
-        }
-    }
-    return matches;
 }
